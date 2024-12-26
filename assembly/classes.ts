@@ -15,13 +15,14 @@ export class Note {
 
 @json
 export class NoteResult {
-  note!: Note;
+  note: Note;
   score: f32;
-  relatedNotes: Note[];
 
-  constructor(note: Note, score: f32, relatedNotes: Note[]) {
+  constructor(
+    note: Note,
+    score: f32
+  ) {
     this.note = note;
     this.score = score;
-    this.relatedNotes = relatedNotes;
   }
 }

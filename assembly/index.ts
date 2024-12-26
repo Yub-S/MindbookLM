@@ -26,7 +26,7 @@ export function generateNoteEmbedding(text: string): f32[] {
 }
 
 /**
- * Add a new note to the database with temporal hierarchy and semantic relationships
+ * Add a new note to the database 
  */
 export function addNote(text: string): Note {
   // Generate embedding for the note
@@ -35,7 +35,7 @@ export function addNote(text: string): Note {
   const vars = new neo4j.Variables();
   const timestamp = Date.now();
   
-  // Get current date components
+  //  current date components
   const now = new Date(timestamp);
   const year = now.getUTCFullYear();
   const monthNames = [
@@ -50,13 +50,13 @@ export function addNote(text: string): Note {
   const dayNumber = now.getUTCDate();
   const dayName = dayNames[now.getUTCDay()];
   
+  
   vars.set("text", text);
   vars.set("embedding", embedding);
   vars.set("year", year);
   vars.set("month", month);
   vars.set("dayNumber", dayNumber);
   vars.set("dayName", dayName);
-  vars.set("timestamp", timestamp);
 
   // Create vector index if it doesn't exist
   const indexQuery = `
@@ -64,36 +64,33 @@ export function addNote(text: string): Note {
     IF NOT EXISTS FOR (n:Note) ON (n.embedding)
   `;
 
-  // Modified query to properly handle day number and name
+  // Main query to create note and establish relationships
   const query = `
-    // Create year node
     MERGE (y:Year {year: $year})
+    MERGE (y)-[:MONTH]->(m:Month {month: $month})
+    MERGE (m)-[:DAY]->(d:Day {value: $dayNumber})
     
-    // Create month node
-    MERGE (y)-[:MONTH]->(m:Month {name: $month})
-    
-    // Create date node (for numerical day)
-    MERGE (m)-[:DATE]->(date:Date {day: $dayNumber})
-    
-    // Create day node (for day name)
-    MERGE (date)-[:DAY]->(d:Day {name: $dayName})
-    
-    // Create the note
     CREATE (n:Note {
       text: $text,
-      embedding: $embedding
+      embedding: $embedding,
+      dayName: $dayName
     })
     
-    // Connect note to day
     MERGE (d)-[:NOTE]->(n)
     
-    RETURN n
+    RETURN n {
+      .text,
+      .dayName,
+      .embedding
+    } as note
   `;
 
-  const result = neo4j.executeQuery(hostName, query, vars);
+  // Execute queries
   neo4j.executeQuery(hostName, indexQuery);
+  const result = neo4j.executeQuery(hostName, query, vars);
   
-  const noteData = JSON.parse<Note>(result.Records[0].get("n"));
+  
+  const noteData = JSON.parse<Note>(result.Records[0].get("note"));
   
   // Create and return a new Note instance with the actual data
   return new Note(
@@ -112,33 +109,31 @@ export function findSimilarNotes(text: string, threshold: f32 = 0.8): NoteResult
   vars.set("threshold", threshold);
 
   const query = `
+    // Find similar notes using vector search
     CALL db.index.vector.queryNodes('note_embeddings_index', 10, $embedding)
     YIELD node AS similarNote, score
     WHERE score >= $threshold
     
-    MATCH (y:Year)-[:HAS_MONTH]->(m:Month)-[:HAS_DAY]->(d:Day)-[:HAS_NOTE]->(similarNote)
+    // Match the path according to our addNote structure
+    MATCH (y:Year)-[:MONTH]->(m:Month)-[:DAY]->(d:Day)-[:NOTE]->(similarNote)
     
-    OPTIONAL MATCH (similarNote)-[r:RELATED_TO]-(relatedNote)
-    WHERE r.score >= $threshold
-    
-    WITH similarNote, score,
-         COLLECT(DISTINCT relatedNote) AS relatedNotes
-    
+    // Return note with its metadata
     RETURN {
-      note: similarNote,
-      score: score,
-      relatedNotes: relatedNotes
+      note: similarNote {
+        .text,
+      },
+      score: score
     } AS result
     ORDER BY score DESC
   `;
 
   const result = neo4j.executeQuery(hostName, query, vars);
+  
   return result.Records.map<NoteResult>((record) => {
     const parsed = JSON.parse<NoteResult>(record.get("result"));
     return new NoteResult(
       parsed.note,
-      parsed.score,
-      parsed.relatedNotes
+      parsed.score
     );
   });
 }
