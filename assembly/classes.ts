@@ -3,13 +3,16 @@
 export class Note {
   text: string;
   embedding: f32[];
+  dayName :string;
 
   constructor(
     text: string = "",
-    embedding: f32[] = []
+    embedding: f32[] = [],
+    dayName: string = ""
   ) {
     this.text = text;
     this.embedding = embedding;
+    this.dayName=dayName;
   }
 }
 

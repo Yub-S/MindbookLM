@@ -1,4 +1,3 @@
-
 // index.ts
 import { neo4j } from "@hypermode/modus-sdk-as";
 import { models } from "@hypermode/modus-sdk-as";
@@ -34,10 +33,9 @@ export function generateNoteEmbedding(text: string): f32[] {
 /**
  * Add a new note to the database 
  */
-export function addNote(otext: string): Note {
+export function addNote(o_text: string): Note {
 
-  const text = preprocess_lm(otext);
-  // Generate embedding for the note
+  const text = preprocess_lm(o_text);
   const embedding = generateNoteEmbedding(text);
   
   const vars = new neo4j.Variables();
@@ -106,10 +104,11 @@ export function addNote(otext: string): Note {
     noteData.embedding
   );
 }
+
 /**
  * Find similar notes based on semantic search
  */
-export function findSimilarNotes(text: string, threshold: f32 = 0.7): NoteResult[] {
+export function findSimilarNotes(text: string, threshold: f32 = 0.6): NoteResult[] {
   const embedding = generateNoteEmbedding(text);
   
   const vars = new neo4j.Variables();
@@ -202,20 +201,16 @@ export function preprocess_lm(text: string, isQuery: boolean = false): string {
       new UserMessage(text)
     ]);
 
-    // Set desired model parameters
     input.temperature = 0.7;
-
-    // Invoke the model
     const output = model.invoke(input);
-    
-    // Get and clean the response
     return output.choices[0].message.content.trim();
 }
 /**
  * Handles querying the system and getting AI-assisted responses
  */
+
 export function querySystem(question: string): string {
-  // First preprocess the question to handle date references
+
   const processedQuestion = preprocess_lm(question,true);
   
   // Find similar notes
@@ -232,10 +227,9 @@ export function querySystem(question: string): string {
  * Gets an AI-assisted answer based on the question and relevant context
  */
 export function getAssistantAnswer(question: string, contextTexts: string[]): string {
-  // Join all context texts with clear separation
+
   const combinedContext = contextTexts.join("\n\n");
-  
-  // Create the system prompt
+
   const systemPrompt = `You are a personal AI assistant with access to the user's stored memories and notes.
 Your task is to answer the user's question based on the context provided from their stored notes.
 Only use information from the provided context to answer. If you can't find relevant information in the context,
