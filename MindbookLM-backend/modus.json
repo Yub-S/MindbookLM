@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.hypermode.com/modus.json",
+  "endpoints": {
+    "default": {
+      "type": "graphql",
+      "path": "/graphql",
+      "auth": "bearer-token"
+    }
+  },
+  "models": {
+    "minilm":{
+      "sourceModel": "sentence-transformers/all-MiniLM-L6-v2",
+      "provider":"hugging-face",
+      "connection":"hypermode"
+    },
+
+    "text-generator":{
+      "sourceModel": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+      "provider":"hugging-face",
+      "connection":"hypermode"
+  },
+
+  "text-generator2":{
+    "sourceModel": "llama-3.3-70b-versatile",
+    "connection":"openai",
+    "path":"chat/completions"
+  }
+},
+  "connections": {
+    "neo4j": {
+      "type": "neo4j",
+      "dbUri": "{{URI}}",
+      "username": "{{USERNAME}}",
+      "password": "{{PASSWORD}}"
+    },
+
+    "openai":{
+      "type":"http",
+      "baseUrl": "https://api.groq.com/openai/v1/",
+      "headers":{
+        "Authorization":"Bearer {{API_KEY}}"
+      }
+    }
+  }
+}

@@ -195,7 +195,7 @@ export function preprocess_lm(text: string, isQuery: boolean = false): string {
   }
 
     // Create the model input
-    const model = models.getModel<OpenAIChatModel>("text-generator");
+    const model = models.getModel<OpenAIChatModel>("text-generator2");
     const input = model.createInput([
       new SystemMessage(instruction),
       new UserMessage(text)
