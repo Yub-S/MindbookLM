@@ -34,14 +34,13 @@ export function generateNoteEmbedding(text: string): f32[] {
  * Add a new note to the database 
  */
 export function addNote(o_text: string): Note {
-
   const text = preprocess_lm(o_text);
   const embedding = generateNoteEmbedding(text);
   
   const vars = new neo4j.Variables();
   const timestamp = Date.now();
   
-  //  current date components
+  // Current date components
   const now = new Date(timestamp);
   const year = now.getUTCFullYear();
   const monthNames = [
@@ -56,13 +55,13 @@ export function addNote(o_text: string): Note {
   const dayNumber = now.getUTCDate();
   const dayName = dayNames[now.getUTCDay()];
   
-  
   vars.set("text", text);
   vars.set("embedding", embedding);
   vars.set("year", year);
   vars.set("month", month);
   vars.set("dayNumber", dayNumber);
   vars.set("dayName", dayName);
+  vars.set("similarityThreshold", 0.8);
 
   // Create vector index if it doesn't exist
   const indexQuery = `
@@ -70,24 +69,40 @@ export function addNote(o_text: string): Note {
     IF NOT EXISTS FOR (n:Note) ON (n.embedding)
   `;
 
-  // Main query to create note and establish relationships
+  // Enhanced query to create note and establish relationships with similar notes
   const query = `
+    // Create temporal hierarchy
     MERGE (y:Year {year: $year})
     MERGE (y)-[:MONTH]->(m:Month {month: $month})
     MERGE (m)-[:DAY]->(d:Day {value: $dayNumber})
     
+    // Create new note
     CREATE (n:Note {
       text: $text,
       embedding: $embedding,
       dayName: $dayName
     })
     
+    // Connect to temporal hierarchy
     MERGE (d)-[:NOTE]->(n)
     
+    // Find and connect similar notes
+    WITH n
+    CALL db.index.vector.queryNodes('note_embeddings_index', 10, $embedding)
+    YIELD node AS similarNote, score
+    WHERE score >= $similarityThreshold 
+    AND similarNote <> n  // Exclude self-relationship
+    
+    // Create RELATED_TO relationships with similarity score
+    MERGE (n)-[r:RELATED_TO]->(similarNote)
+    SET r.similarity_score = score
+    
+    // Return the original note
+    WITH n
     RETURN n {
       .text,
-      .dayName,
-      .embedding
+      .embedding,
+      .dayName
     } as note
   `;
 
@@ -95,10 +110,9 @@ export function addNote(o_text: string): Note {
   neo4j.executeQuery(hostName, indexQuery);
   const result = neo4j.executeQuery(hostName, query, vars);
   
-  
   const noteData = JSON.parse<Note>(result.Records[0].get("note"));
   
-  // Create and return a new Note instance with the actual data
+  // Create and return a new Note instance matching the existing class structure
   return new Note(
     noteData.text,
     noteData.embedding
