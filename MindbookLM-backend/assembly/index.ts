@@ -136,7 +136,7 @@ export function findSimilarNotes(text: string, threshold: f32 = 0.6): NoteResult
   vars.set("threshold", threshold);
 
   const query = `
-    // Find similar notes using vector search
+    // First find the top similar notes
     CALL db.index.vector.queryNodes('note_embeddings_index', 10, $embedding)
     YIELD node AS similarNote, score
     WHERE score >= $threshold
@@ -144,27 +144,33 @@ export function findSimilarNotes(text: string, threshold: f32 = 0.6): NoteResult
     // Match temporal path for similar notes
     MATCH (y:Year)-[:MONTH]->(m:Month)-[:DAY]->(d:Day)-[:NOTE]->(similarNote)
     
-    // Get related notes while avoiding duplicates
-    WITH similarNote, score
-    OPTIONAL MATCH (similarNote)-[:RELATED_TO]-(relatedNote:Note)
-    WHERE NOT relatedNote = similarNote
+    // Collect similar notes to use for filtering
+    WITH collect(similarNote) as similarNotes, similarNote, score
+    
+    // Get related notes for each similar note
+    OPTIONAL MATCH (similarNote)-[:RELATED_TO]->(relatedNote:Note)
+    WHERE NOT relatedNote IN similarNotes
     
     // Group results and collect unique related notes
     WITH 
-      similarNote {
-        .text,
-        .embedding,
-        .dayName
-      } as note,
+      similarNote,
       score,
-      collect(DISTINCT relatedNote.text) as relatedTexts
-    WHERE relatedTexts IS NOT NULL
+      collect(DISTINCT relatedNote) as relatedNotes,
+      similarNotes
     
-    // Return results maintaining original structure
+    // Return results with filtered related notes
     RETURN {
-      note: note,
+      note: {
+        text: similarNote.text,
+        embedding: similarNote.embedding,
+        dayName: similarNote.dayName
+      },
       score: score,
-      relatedNotes: [x IN relatedTexts WHERE x IS NOT NULL]
+      relatedNotes: [
+        note IN relatedNotes 
+        WHERE note IS NOT NULL |
+        note.text
+      ]
     } as result
     ORDER BY result.score DESC
   `;
@@ -172,15 +178,21 @@ export function findSimilarNotes(text: string, threshold: f32 = 0.6): NoteResult
   const result = neo4j.executeQuery(hostName, query, vars);
   
   return result.Records.map<NoteResult>((record) => {
-    const parsed = JSON.parse<NoteResult>(record.get("result"));
+    const rawResult = JSON.parse<NoteResult>(record.get("result"));
+    
+    const note = new Note(
+      rawResult.note.text,
+      rawResult.note.embedding,
+      rawResult.note.dayName
+    );
+    
     return new NoteResult(
-      parsed.note,
-      parsed.score,
-      parsed.relatedNotes
+      note,
+      rawResult.score,
+      rawResult.relatedNotes
     );
   });
 }
-
 export function deleteAllData(confirmation: string): string {
   // Check if confirmation matches the required string
   if (confirmation.toLowerCase() !== "delete") {
