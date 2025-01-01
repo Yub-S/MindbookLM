@@ -69,7 +69,7 @@ export function addNote(o_text: string): Note {
     IF NOT EXISTS FOR (n:Note) ON (n.embedding)
   `;
 
-  // Enhanced query to create note and establish relationships with similar notes
+  // Enhanced query to create note and establish bidirectional relationships
   const query = `
     // Create temporal hierarchy
     MERGE (y:Year {year: $year})
@@ -93,9 +93,11 @@ export function addNote(o_text: string): Note {
     WHERE score >= $similarityThreshold 
     AND similarNote <> n  // Exclude self-relationship
     
-    // Create RELATED_TO relationships with similarity score
-    MERGE (n)-[r:RELATED_TO]->(similarNote)
-    SET r.similarity_score = score
+    // Create bidirectional RELATED_TO relationships
+    MERGE (n)-[r1:RELATED_TO]->(similarNote)
+    MERGE (similarNote)-[r2:RELATED_TO]->(n)
+    SET r1.similarity_score = score
+    SET r2.similarity_score = score
     
     // Return the original note
     WITH n
@@ -112,10 +114,11 @@ export function addNote(o_text: string): Note {
   
   const noteData = JSON.parse<Note>(result.Records[0].get("note"));
   
-  // Create and return a new Note instance matching the existing class structure
+  // Create and return a new Note instance
   return new Note(
     noteData.text,
-    noteData.embedding
+    noteData.embedding,
+    noteData.dayName
   );
 }
 
@@ -135,18 +138,27 @@ export function findSimilarNotes(text: string, threshold: f32 = 0.6): NoteResult
     YIELD node AS similarNote, score
     WHERE score >= $threshold
     
-    // Match the path according to our addNote structure
+    // Match temporal path for similar notes
     MATCH (y:Year)-[:MONTH]->(m:Month)-[:DAY]->(d:Day)-[:NOTE]->(similarNote)
     
-    // Return note with its metadata
+    // Collect related notes
+    WITH similarNote, score
+    OPTIONAL MATCH (similarNote)-[:RELATED_TO]-(relatedNote:Note)
+    
+    // Group and collect related notes while preserving score
+    WITH similarNote, score, collect(DISTINCT relatedNote.text) as relatedTexts
+    
+    // Return both similar and related notes
     RETURN {
       note: similarNote {
         .text,
-        .embedding
+        .embedding,
+        .dayName
       },
-      score: score
+      score: score,
+      relatedNotes: relatedTexts
     } AS result
-    ORDER BY score DESC
+    ORDER BY result.score DESC
   `;
 
   const result = neo4j.executeQuery(hostName, query, vars);
@@ -155,7 +167,8 @@ export function findSimilarNotes(text: string, threshold: f32 = 0.6): NoteResult
     const parsed = JSON.parse<NoteResult>(record.get("result"));
     return new NoteResult(
       parsed.note,
-      parsed.score
+      parsed.score,
+      parsed.relatedNotes
     );
   });
 }

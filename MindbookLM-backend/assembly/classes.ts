@@ -20,12 +20,15 @@ export class Note {
 export class NoteResult {
   note: Note;
   score: f32;
+  relatedNotes: string[];  // Array of related note texts
 
   constructor(
     note: Note,
-    score: f32
+    score: f32,
+    relatedNotes: string[] = []  // Default to empty array
   ) {
     this.note = note;
     this.score = score;
+    this.relatedNotes = relatedNotes;
   }
 }
