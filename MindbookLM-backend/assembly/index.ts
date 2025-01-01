@@ -61,7 +61,7 @@ export function addNote(o_text: string): Note {
   vars.set("month", month);
   vars.set("dayNumber", dayNumber);
   vars.set("dayName", dayName);
-  vars.set("similarityThreshold", 0.8);
+  vars.set("similarityThreshold", 0.7);
 
   // Create vector index if it doesn't exist
   const indexQuery = `
@@ -69,8 +69,8 @@ export function addNote(o_text: string): Note {
     IF NOT EXISTS FOR (n:Note) ON (n.embedding)
   `;
 
-  // Enhanced query to create note and establish bidirectional relationships
-  const query = `
+  // Split the query into two parts - first create the note
+  const createNoteQuery = `
     // Create temporal hierarchy
     MERGE (y:Year {year: $year})
     MERGE (y)-[:MONTH]->(m:Month {month: $month})
@@ -86,21 +86,7 @@ export function addNote(o_text: string): Note {
     // Connect to temporal hierarchy
     MERGE (d)-[:NOTE]->(n)
     
-    // Find and connect similar notes
-    WITH n
-    CALL db.index.vector.queryNodes('note_embeddings_index', 10, $embedding)
-    YIELD node AS similarNote, score
-    WHERE score >= $similarityThreshold 
-    AND similarNote <> n  // Exclude self-relationship
-    
-    // Create bidirectional RELATED_TO relationships
-    MERGE (n)-[r1:RELATED_TO]->(similarNote)
-    MERGE (similarNote)-[r2:RELATED_TO]->(n)
-    SET r1.similarity_score = score
-    SET r2.similarity_score = score
-    
-    // Return the original note
-    WITH n
+    // Return the created note
     RETURN n {
       .text,
       .embedding,
@@ -108,13 +94,30 @@ export function addNote(o_text: string): Note {
     } as note
   `;
 
-  // Execute queries
+  // Second query to create relationships (optional)
+  const createRelationshipsQuery = `
+    MATCH (n:Note {text: $text})
+    CALL db.index.vector.queryNodes('note_embeddings_index', 10, $embedding)
+    YIELD node AS similarNote, score
+    WHERE score >= $similarityThreshold 
+    AND similarNote <> n
+    
+    // Create relationships
+    MERGE (n)-[r:RELATED_TO]->(similarNote)
+    SET r.similarity_score = score
+  `;
+
+  // Execute queries in sequence
   neo4j.executeQuery(hostName, indexQuery);
-  const result = neo4j.executeQuery(hostName, query, vars);
   
-  const noteData = JSON.parse<Note>(result.Records[0].get("note"));
+  // Create the note first
+  const createResult = neo4j.executeQuery(hostName, createNoteQuery, vars);
+  const noteData = JSON.parse<Note>(createResult.Records[0].get("note"));
   
-  // Create and return a new Note instance
+  // Try to create relationships, but ignore any failures
+  neo4j.executeQuery(hostName, createRelationshipsQuery, vars);
+  
+  // Return the note regardless of relationship creation success
   return new Note(
     noteData.text,
     noteData.embedding,
