@@ -233,7 +233,7 @@ export function getAssistantAnswer(question: string, contextTexts: string[]): st
   const systemPrompt = `You are a personal AI assistant with access to the user's stored memories and notes.
 Your task is to answer the user's question based on the context provided from their stored notes.
 Only use information from the provided context to answer. If you can't find relevant information in the context,
-let the user know that you don't have any stored memories about that topic.`;
+let the user know that you don't have any stored memories about that topic.respond with something like 'yes i remember that' or 'no i don't remember you telling me that ..... if possible or necessary. be as friendly as possible.`;
 
   // Create the user prompt combining question and context
   const userPrompt = `Context from your memory:
