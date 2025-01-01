@@ -1,9 +1,8 @@
-// classes.ts
 @json
 export class Note {
   text: string;
   embedding: f32[];
-  dayName :string;
+  dayName: string;
 
   constructor(
     text: string = "",
@@ -12,7 +11,7 @@ export class Note {
   ) {
     this.text = text;
     this.embedding = embedding;
-    this.dayName=dayName;
+    this.dayName = dayName;
   }
 }
 
@@ -20,12 +19,12 @@ export class Note {
 export class NoteResult {
   note: Note;
   score: f32;
-  relatedNotes: string[];  // Array of related note texts
+  relatedNotes: string[];  
 
   constructor(
     note: Note,
     score: f32,
-    relatedNotes: string[] = []  // Default to empty array
+    relatedNotes: string[] = []  
   ) {
     this.note = note;
     this.score = score;

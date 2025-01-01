@@ -141,23 +141,28 @@ export function findSimilarNotes(text: string, threshold: f32 = 0.6): NoteResult
     // Match temporal path for similar notes
     MATCH (y:Year)-[:MONTH]->(m:Month)-[:DAY]->(d:Day)-[:NOTE]->(similarNote)
     
-    // Collect related notes
+    // Get related notes while avoiding duplicates
     WITH similarNote, score
     OPTIONAL MATCH (similarNote)-[:RELATED_TO]-(relatedNote:Note)
+    WHERE NOT relatedNote = similarNote
     
-    // Group and collect related notes while preserving score
-    WITH similarNote, score, collect(DISTINCT relatedNote.text) as relatedTexts
-    
-    // Return both similar and related notes
-    RETURN {
-      note: similarNote {
+    // Group results and collect unique related notes
+    WITH 
+      similarNote {
         .text,
         .embedding,
         .dayName
-      },
+      } as note,
+      score,
+      collect(DISTINCT relatedNote.text) as relatedTexts
+    WHERE relatedTexts IS NOT NULL
+    
+    // Return results maintaining original structure
+    RETURN {
+      note: note,
       score: score,
-      relatedNotes: relatedTexts
-    } AS result
+      relatedNotes: [x IN relatedTexts WHERE x IS NOT NULL]
+    } as result
     ORDER BY result.score DESC
   `;
 
@@ -237,16 +242,25 @@ export function preprocess_lm(text: string, isQuery: boolean = false): string {
  */
 
 export function querySystem(question: string): string {
-
-  const processedQuestion = preprocess_lm(question,true);
+  const processedQuestion = preprocess_lm(question, true);
   
-  // Find similar notes
-  const similarNotes = findSimilarNotes(processedQuestion);
+  // Find similar notes and their related notes
+  const notes = findSimilarNotes(processedQuestion);
   
-  // Extract all the note texts to use as context
-  const contextTexts = similarNotes.map<string>((result) => result.note.text);
+  // Extract all context including both similar and related notes
+  const contextTexts = notes.map<string>((result) => {
+    // Start with the main similar note
+    let noteContext = result.note.text;
+    
+    // Add related notes if they exist
+    if (result.relatedNotes && result.relatedNotes.length > 0) {
+      noteContext += "\n\nRelated context:\n" + result.relatedNotes.join("\n");
+    }
+    
+    return noteContext;
+  });
   
-  // Get AI-assisted answer using the context
+  // Get AI-assisted answer using the expanded context
   return getAssistantAnswer(processedQuestion, contextTexts);
 }
 
@@ -254,21 +268,23 @@ export function querySystem(question: string): string {
  * Gets an AI-assisted answer based on the question and relevant context
  */
 export function getAssistantAnswer(question: string, contextTexts: string[]): string {
-
-  const combinedContext = contextTexts.join("\n\n");
+  const combinedContext = contextTexts.join("\n\n---\n\n");  // Added separator for clarity
 
   const systemPrompt = `You are a personal AI assistant with access to the user's stored memories and notes.
 Your task is to answer the user's question based on the context provided from their stored notes.
+The context includes both directly relevant notes and related memories that might provide additional context.
 Only use information from the provided context to answer. If you can't find relevant information in the context,
-let the user know that you don't have any stored memories about that topic.respond with something like 'yes i remember that' or 'no i don't remember you telling me that ..... if possible or necessary. be as friendly as possible.`;
+let the user know that you don't have any stored memories about that topic.
+Respond with something like 'yes i remember that' or 'no i don't remember you telling me that...' if possible or necessary.
+Be as friendly as possible and try to make connections between related pieces of information when relevant.`;
 
   // Create the user prompt combining question and context
-  const userPrompt = `Context from your memory:
+  const userPrompt = `Context from your memory (including related memories):
 ${combinedContext}
 
 Question: ${question}
 
-Please answer based on the stored memories above.`;
+Please answer based on the stored memories above, making connections between related information when relevant.`;
 
   // Get the model and create input
   const model = models.getModel<OpenAIChatModel>("text-generator");
