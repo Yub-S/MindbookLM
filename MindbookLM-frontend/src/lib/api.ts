@@ -52,12 +52,8 @@ type FetchQueryProps = {
   
   export async function addNote(text: string) {
     const graphqlQuery = `
-      mutation AddNote($o_text: String!) {
-        addNote(o_text: $o_text) {
-          text
-          embedding
-          dayName
-        }
+      mutation($o_text: String!) {
+        addNote(o_text: $o_text)
       }
     `
     

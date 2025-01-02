@@ -319,26 +319,19 @@ export function deleteAllData(confirmation: string): string {
   return "success";
 }
 
-export function preprocess_lm(text: string, isQuery: boolean = false): string {
+export function preprocess_lm(text: string): string {
   const timestamp = Date.now();
   const now = new Date(timestamp);
   
   let instruction: string;
   
-  if (isQuery) {
-    instruction = `Current date is ${now}.
-    Convert any relative date references (today, tomorrow, next week, etc.) in this query to actual dates. If there is nothing relative, ignore the date provided, and just provide the query as it is.
-    Original query: "${text}"
-    Only output the converted query with no explanations or additional text.`;
-  } else {
-    instruction = `Current date is ${now} 
-    1. Convert any relative date references (today, tomorrow, next week, etc.) in this text to their actual dates.
-    2. Add 'on [date] ' where appropriate but don't change any other information like the actual text.
-    
-    Original text: "${text}"
-    Only output the converted text with NO EXPLANATION or additional text.`;
-  }
-
+  instruction = `Current date is ${now} 
+  1. Convert any relative date references (today, tomorrow, next week, etc.) in this text to their actual dates.
+  2. Add 'on [date] ' where appropriate but don't change any other information like the actual text.
+  
+  Original text: "${text}"
+  Only output the converted text with NO EXPLANATION or additional text.`;
+  
   const model = models.getModel<OpenAIChatModel>("text-generator2");
   const input = model.createInput([
     new SystemMessage(instruction),
@@ -375,7 +368,8 @@ export function getAssistantAnswer(question: string, contextTexts: string[]): st
   const combinedContext = contextTexts.join("\n\n---\n\n");
 
   const systemPrompt = `You are a personal AI assistant with access to the user's stored memories and notes.
-Your task is to answer the user's question based on the context provided from their stored notes.
+Your task is to answer the user's question based on the context provided from their stored notes. 
+try to answer what user is asking, in the same manner user is asking.
 The context includes both directly relevant notes and related memories that might provide additional context.
 Only use information from the provided context to answer. If you can't find relevant information in the context,
 let the user know that you don't have any stored memories about that topic.
@@ -389,7 +383,7 @@ Question: ${question}
 
 Please answer based on the stored memories above, making connections between related information when relevant.`;
 
-  const model = models.getModel<OpenAIChatModel>("text-generator");
+  const model = models.getModel<OpenAIChatModel>("text-generator2");
   const input = model.createInput([
     new SystemMessage(systemPrompt),
     new UserMessage(userPrompt)
