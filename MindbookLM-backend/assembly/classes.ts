@@ -31,3 +31,37 @@ export class NoteResult {
     this.relatedNotes = relatedNotes;
   }
 }
+
+@json
+export class QueryDecision {
+  processedQuery: string;
+  queryType: string; // "general" or "similarity"
+  timeConstraints: TimeConstraints;
+
+  constructor(
+    processedQuery: string = "",
+    queryType: string = "similarity",
+    timeConstraints: TimeConstraints = new TimeConstraints()
+  ) {
+    this.processedQuery = processedQuery;
+    this.queryType = queryType;
+    this.timeConstraints = timeConstraints;
+  }
+}
+
+@json
+export class TimeConstraints {
+  year: string | null;
+  month: string | null;
+  day: string | null;
+
+  constructor(
+    year: string | null = null,
+    month: string | null = null,
+    day: string | null = null
+  ) {
+    this.year = year;
+    this.month = month;
+    this.day = day;
+  }
+}
