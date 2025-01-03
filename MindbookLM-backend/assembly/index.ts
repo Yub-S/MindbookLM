@@ -182,7 +182,7 @@ export function queryDecider(query: string): QueryDecision {
     - Examples: "anything about khalti?", "what did I write about AI"
 
   Your task:
-  1. convert any relative dates (yester, last month, last year, today, tomorrow, next week or so) in this query to actual dates
+  1. convert any relative dates (yesterday, last month, last year, today, tomorrow, next week or so) in this query to actual dates
   1. Analyze if the query needs temporal matching or similarity search
   3. Set timeConstraints based on query type:
 
@@ -217,18 +217,7 @@ export function queryDecider(query: string): QueryDecision {
     }
   }
 
-  3. Temporal query (just month):
-  {
-    "processedQuery": "what happened in January 2025",
-    "queryType": "general", 
-    "timeConstraints": {
-      "year": 2025,
-      "month": "January",
-      "day": null
-    }
-  }
-
-  4. Content search:
+  3. Content search:
   {
     "processedQuery": "anything about khalti ceo",
     "queryType": "similarity",
@@ -260,42 +249,51 @@ export function queryDecider(query: string): QueryDecision {
   return result;
   }
 
-export function findNotesByTimeConstraints(timeConstraints: TimeConstraints): string[] {
-  const vars = new neo4j.Variables();
-  
-  let query = "MATCH (y:Year)";
-  let whereClause = "";
-  
-  if (timeConstraints.year !== null) {
-    const yearValue = parseInt(timeConstraints.year as string);
-    vars.set("year", yearValue);
-    whereClause += "y.year = $year";
+  export function findNotesByTimeConstraints(timeConstraints: TimeConstraints): string[] {
+    const vars = new neo4j.Variables();
+    
+    let query = "MATCH (y:Year)";
+    let whereClause = "";
+    
+    if (timeConstraints.year !== null) {
+      // Just convert to number since that's how it's stored
+      const yearValue = parseInt(timeConstraints.year as string);
+      vars.set("year", yearValue);
+      whereClause += "y.year = $year";
+    }
+    
+    if (timeConstraints.month !== null) {
+      query += "-[:MONTH]->(m:Month)";
+      vars.set("month", timeConstraints.month);
+      whereClause += whereClause ? " AND m.month = $month" : "m.month = $month";
+    }
+    
+    if (timeConstraints.day !== null) {
+      query += "-[:DAY]->(d:Day)";
+      // Just convert to number since that's how it's stored
+      const dayValue = parseInt(timeConstraints.day as string);
+      vars.set("day", dayValue);
+      whereClause += whereClause ? " AND d.value = $day" : "d.value = $day";
+    }
+    
+    query += (timeConstraints.day !== null ? "" : "-[:DAY]->(d:Day)") + "-[:NOTE]->(n:Note)";
+    
+    if (whereClause) {
+      query += " WHERE " + whereClause;
+    }
+    
+    query += " RETURN n.text as text";
+    
+    console.log("Final Query: " + query);
+    // Simple string concatenation for logging variables in AssemblyScript
+    console.log("Variables - year: " + (timeConstraints.year || "null") + 
+                ", month: " + (timeConstraints.month || "null") + 
+                ", day: " + (timeConstraints.day || "null"));
+    
+    const result = neo4j.executeQuery(hostName, query, vars);
+    console.log(result.Records.map<string>((record) => record.get("text")).join(", "));
+    return result.Records.map<string>((record) => record.get("text"));
   }
-  
-  if (timeConstraints.month !== null) {
-    query += "-[:MONTH]->(m:Month)";
-    vars.set("month", timeConstraints.month);
-    whereClause += whereClause ? " AND m.month = $month" : "m.month = $month";
-  }
-  
-  if (timeConstraints.day !== null) {
-    query += "-[:DAY]->(d:Day)";
-    const dayValue = parseInt(timeConstraints.day as string);
-    vars.set("day", dayValue);
-    whereClause += whereClause ? " AND d.value = $day" : "d.value = $day";
-  }
-  
-  query += (timeConstraints.day !== null ? "" : "-[:DAY]->(d:Day)") + "-[:NOTE]->(n:Note)";
-  
-  if (whereClause) {
-    query += " WHERE " + whereClause;
-  }
-  
-  query += " RETURN n.text as text";
-  
-  const result = neo4j.executeQuery(hostName, query, vars);
-  return result.Records.map<string>((record) => record.get("text"));
-}
 
 export function deleteAllData(confirmation: string): string {
   if (confirmation.toLowerCase() !== "delete") {
@@ -326,8 +324,17 @@ export function preprocess_lm(text: string): string {
   let instruction: string;
   
   instruction = `Current date is ${now} 
-  1. Convert any relative date references (today, tomorrow, next week, etc.) in this text to their actual dates.
-  2. Add 'on [date] ' where appropriate but don't change any other information like the actual text.
+"Convert any/all the relative date references (e.g., 'next Monday', 'yesterday', 'last Sunday', 'last month', 'last year') into the actual date format (e.g., 'January 12, 2025'), while ensuring the sentence sounds natural and maintains the same meaning. Keep the user's original phrasing, spelling, and style exactly as it is, only replacing relative date references with the correct absolute dates. For past references like 'yesterday' or 'last Sunday', ensure that the date reflects the actual day in the past. For future references like 'next Monday', make sure the conversion matches the actual date based on the current date provided. Do not change any other part of the sentence."
+
+  Example input:
+  "Yesterday, I had a lot of fun."
+  "Next Monday, I have a meeting with my friends."
+  "Last Sunday, we went hiking."
+
+  Expected output:
+  "yesterday(On January 1, 2025), I had a lot of fun."
+  "next monday(On January 12, 2025), I have a meeting with my friends."
+  "last sunday(On December 28, 2024), we went hiking."
   
   Original text: "${text}"
   Only output the converted text with NO EXPLANATION or additional text.`;
@@ -345,12 +352,28 @@ export function preprocess_lm(text: string): string {
 
 export function querySystem(question: string): string {
   const decision = queryDecider(question);
-  
-  let contextTexts: string[];
+  let contextTexts: string[] = [];
   
   if (decision.queryType === "general") {
-    contextTexts = findNotesByTimeConstraints(decision.timeConstraints);
+    // First try temporal matching
+    const temporalResults = findNotesByTimeConstraints(decision.timeConstraints);
+    
+    if (temporalResults.length > 0) {
+      // If temporal search yields results, use those
+      contextTexts = temporalResults;
+    } else {
+      // If no temporal results, fall back to similarity search
+      const notes = findSimilarNotes(decision.processedQuery);
+      contextTexts = notes.map<string>((result) => {
+        let noteContext = result.note.text;
+        if (result.relatedNotes && result.relatedNotes.length > 0) {
+          noteContext += "\n\nRelated context:\n" + result.relatedNotes.join("\n");
+        }
+        return noteContext;
+      });
+    }
   } else {
+    // For similarity queries, behavior remains unchanged
     const notes = findSimilarNotes(decision.processedQuery);
     contextTexts = notes.map<string>((result) => {
       let noteContext = result.note.text;
@@ -369,7 +392,6 @@ export function getAssistantAnswer(question: string, contextTexts: string[]): st
 
   const systemPrompt = `You are a personal AI assistant with access to the user's stored memories and notes.
 Your task is to answer the user's question based on the context provided from their stored notes. 
-try to answer what user is asking, in the same manner user is asking.
 The context includes both directly relevant notes and related memories that might provide additional context.
 Only use information from the provided context to answer. If you can't find relevant information in the context,
 let the user know that you don't have any stored memories about that topic.
@@ -383,7 +405,7 @@ Question: ${question}
 
 Please answer based on the stored memories above, making connections between related information when relevant.`;
 
-  const model = models.getModel<OpenAIChatModel>("text-generator2");
+  const model = models.getModel<OpenAIChatModel>("text-generator");
   const input = model.createInput([
     new SystemMessage(systemPrompt),
     new UserMessage(userPrompt)
