@@ -182,7 +182,7 @@ export function queryDecider(query: string): QueryDecision {
     - Examples: "anything about khalti?", "what did I write about AI"
 
   Your task:
-  1. convert any relative dates (yesterday, last month, last year, today, tomorrow, next week or so) in this query to actual dates
+  1. convert any relative dates (yesterday, last month, last year, today, tomorrow, next week or similar others) in this query to actual dates
   1. Analyze if the query needs temporal matching or similarity search
   3. Set timeConstraints based on query type:
 
@@ -256,7 +256,7 @@ export function queryDecider(query: string): QueryDecision {
     let whereClause = "";
     
     if (timeConstraints.year !== null) {
-      // Just convert to number since that's how it's stored
+
       const yearValue = parseInt(timeConstraints.year as string);
       vars.set("year", yearValue);
       whereClause += "y.year = $year";
@@ -270,7 +270,7 @@ export function queryDecider(query: string): QueryDecision {
     
     if (timeConstraints.day !== null) {
       query += "-[:DAY]->(d:Day)";
-      // Just convert to number since that's how it's stored
+   
       const dayValue = parseInt(timeConstraints.day as string);
       vars.set("day", dayValue);
       whereClause += whereClause ? " AND d.value = $day" : "d.value = $day";
@@ -284,14 +284,7 @@ export function queryDecider(query: string): QueryDecision {
     
     query += " RETURN n.text as text";
     
-    console.log("Final Query: " + query);
-    // Simple string concatenation for logging variables in AssemblyScript
-    console.log("Variables - year: " + (timeConstraints.year || "null") + 
-                ", month: " + (timeConstraints.month || "null") + 
-                ", day: " + (timeConstraints.day || "null"));
-    
     const result = neo4j.executeQuery(hostName, query, vars);
-    console.log(result.Records.map<string>((record) => record.get("text")).join(", "));
     return result.Records.map<string>((record) => record.get("text"));
   }
 
@@ -395,15 +388,14 @@ Your task is to answer the user's question based on the context provided from th
 The context includes both directly relevant notes and related memories that might provide additional context.
 Only use information from the provided context to answer. If you can't find relevant information in the context,
 let the user know that you don't have any stored memories about that topic.
-Respond with something like 'yes i remember that' or 'no i don't remember you telling me that...' if possible or necessary.
-Be as friendly as possible and try to make connections between related pieces of information when relevant.`;
+Be as friendly as possible .`;
 
   const userPrompt = `Context from your memory (including related memories):
 ${combinedContext}
 
 Question: ${question}
 
-Please answer based on the stored memories above, making connections between related information when relevant.`;
+Please answer based on the stored memories above.`;
 
   const model = models.getModel<OpenAIChatModel>("text-generator");
   const input = model.createInput([
