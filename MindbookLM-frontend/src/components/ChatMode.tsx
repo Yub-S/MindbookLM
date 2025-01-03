@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 type Message = {
   id: string;
@@ -18,10 +18,29 @@ type ChatModeProps = {
   onInputChange: (value: string) => void;
   onSendMessage: (message: string) => void;
   onBack: () => void;
+  isLoading?: boolean;
 };
 
-export function ChatMode({ messages, inputValue, onInputChange, onSendMessage, onBack }: ChatModeProps) {
+const TypingIndicator = () => (
+  <div className="flex space-x-2 max-w-[80%] mr-auto mb-4">
+    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+  </div>
+);
+
+export function ChatMode({ messages, inputValue, onInputChange, onSendMessage, onBack, isLoading = false }: ChatModeProps) {
   const [showFullChat, setShowFullChat] = useState(false);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
+  }, [messages, isLoading]);
 
   const handleSubmit = () => {
     if (!inputValue.trim()) return;
@@ -94,7 +113,7 @@ export function ChatMode({ messages, inputValue, onInputChange, onSendMessage, o
           animate={{ opacity: 1, scale: 1 }}
           className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-lg rounded-xl shadow-xl p-6 h-[600px] flex flex-col border-2 border-purple-500/20"
         >
-          <ScrollArea className="flex-1 pr-4">
+          <ScrollArea ref={scrollAreaRef} className="flex-1 pr-4">
             <AnimatePresence mode="popLayout">
               {messages.map((message) => (
                 <motion.div
@@ -120,6 +139,7 @@ export function ChatMode({ messages, inputValue, onInputChange, onSendMessage, o
                 </motion.div>
               ))}
             </AnimatePresence>
+            {isLoading && <TypingIndicator />}
           </ScrollArea>
 
           <div className="mt-4 flex gap-2">

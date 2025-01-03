@@ -113,7 +113,7 @@ function App() {
             onInputChange={setInputText}
             onSendMessage={handleChat}
             onBack={() => setMode('landing')}
-            //isLoading={isLoading}
+            isLoading={isLoading}
           />
         )}
       </div>
