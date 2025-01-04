@@ -29,7 +29,7 @@
   "connections": {
     "neo4j": {
       "type": "neo4j",
-      "dbUri": "{{URI}}",
+      "dbUri": "bolt://18.206.124.13",
       "username": "{{USERNAME}}",
       "password": "{{PASSWORD}}"
     },
