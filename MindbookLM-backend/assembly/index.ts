@@ -373,7 +373,6 @@ export function querySystem(question: string): string {
       if (result.relatedNotes && result.relatedNotes.length > 0) {
         noteContext += "\n\nRelated context:\n" + result.relatedNotes.join("\n");
       }
-      console.log(noteContext);
       return noteContext;
     });
   }
@@ -384,13 +383,12 @@ export function querySystem(question: string): string {
 export function getAssistantAnswer(question: string, contextTexts: string[]): string {
   const combinedContext = contextTexts.join("\n\n---\n\n");
 
-  const systemPrompt = `You are an AI assistant that helps the user recall their stored memories.  
-Your role is to provide clear and concise reminders based only on the provided context.  
-- Stick strictly to the context and avoid adding any new information or asking follow-up questions.  
-- Frame responses as friendly and helpful reminders.  
-- If no relevant context is found, let the user know politely.  
-
-Be brief, precise though include every details, and focused on reminding the user of their memories.`;
+  const systemPrompt = `You are a personal AI assistant with access to the user's stored memories and notes.
+Your task is to answer the user's question based on the context provided from their stored notes. 
+The context includes both directly relevant notes and related memories that might provide additional context.
+Only use information from the provided context to answer. If you can't find relevant information in the context,
+let the user know that you don't have any stored memories about that topic or the user hasn't shared them with you.
+Be as friendly as possible . Be precise and concise in your answers.`;
 
   const userPrompt = `Context from your memory (including related memories):
 ${combinedContext}
