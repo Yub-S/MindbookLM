@@ -32,14 +32,13 @@ export function generateNoteEmbedding(text: string): f32[] {
 /**
  * Add a new note to the database 
  */
-export function addNote(o_text: string): string {
+export function addNote(o_text: string, userId: string): string {
   const text = preprocess_lm(o_text);
   const embedding = generateNoteEmbedding(text);
   
   const vars = new neo4j.Variables();
   const timestamp = Date.now();
   
-  // Current date components
   const now = new Date(timestamp);
   const year = now.getUTCFullYear();
   const monthNames = [
@@ -61,6 +60,7 @@ export function addNote(o_text: string): string {
   vars.set("dayNumber", dayNumber);
   vars.set("dayName", dayName);
   vars.set("similarityThreshold", 0.7);
+  vars.set("userId", userId);
 
   // Create vector index if it doesn't exist
   const indexQuery = `
@@ -68,11 +68,15 @@ export function addNote(o_text: string): string {
     IF NOT EXISTS FOR (n:Note) ON (n.embedding)
   `;
 
+  // Create user node and temporal hierarchy under it
   const createNoteQuery = `
-    // Create temporal hierarchy
-    MERGE (y:Year {year: $year})
-    MERGE (y)-[:MONTH]->(m:Month {month: $month})
-    MERGE (m)-[:DAY]->(d:Day {value: $dayNumber})
+    // Ensure user exists
+    MERGE (u:User {id: $userId})
+    
+    // Create temporal hierarchy under user
+    MERGE (u)-[:HAS_YEAR]->(y:Year {year: $year})
+    MERGE (y)-[:HAS_MONTH]->(m:Month {month: $month})
+    MERGE (m)-[:HAS_DAY]->(d:Day {value: $dayNumber})
     
     // Create new note
     CREATE (n:Note {
@@ -82,77 +86,70 @@ export function addNote(o_text: string): string {
     })
     
     // Connect to temporal hierarchy
-    MERGE (d)-[:NOTE]->(n)
+    MERGE (d)-[:HAS_NOTE]->(n)
     
-    // Return success message
     RETURN 'Note successfully created and connected to temporal hierarchy' as message
   `;
 
+  // Find relationships between notes under the same user
   const createRelationshipsQuery = `
-    MATCH (n:Note {text: $text})
+    MATCH (u:User {id: $userId})-[:HAS_YEAR]->(:Year)-[:HAS_MONTH]->(:Month)-[:HAS_DAY]->(:Day)-[:HAS_NOTE]->(n:Note {text: $text})
     CALL db.index.vector.queryNodes('note_embeddings_index', 10, $embedding)
     YIELD node AS similarNote, score
     WHERE score >= $similarityThreshold 
     AND similarNote <> n
+    AND EXISTS((u)-[:HAS_YEAR]->(:Year)-[:HAS_MONTH]->(:Month)-[:HAS_DAY]->(:Day)-[:HAS_NOTE]->(similarNote))
     
-    // Create relationships
     MERGE (n)-[r:RELATED_TO]->(similarNote)
     SET r.similarity_score = score
   `;
 
-  // Execute queries in sequence
   neo4j.executeQuery(hostName, indexQuery);
-  
   const createResult = neo4j.executeQuery(hostName, createNoteQuery, vars);
   const successMessage = createResult.Records[0].get("message");
-  
   neo4j.executeQuery(hostName, createRelationshipsQuery, vars);
   
   return successMessage;
 }
 
-/**
- * Find similar notes based on semantic search
- */
-export function findSimilarNotes(text: string, threshold: f32 = 0.6): NoteResult[] {
+export function findSimilarNotes(text: string, userId: string, threshold: f32 = 0.6): NoteResult[] {
   const embedding = generateNoteEmbedding(text);
   
   const vars = new neo4j.Variables();
   vars.set("embedding", embedding);
   vars.set("threshold", threshold);
+  vars.set("userId", userId);
 
   const query = `
-    CALL db.index.vector.queryNodes('note_embeddings_index', 10, $embedding)
-    YIELD node AS similarNote, score
-    WHERE score >= $threshold
-    
-    MATCH (y:Year)-[:MONTH]->(m:Month)-[:DAY]->(d:Day)-[:NOTE]->(similarNote)
-    
-    WITH collect(similarNote) as similarNotes, similarNote, score
-    
-    OPTIONAL MATCH (similarNote)-[:RELATED_TO]-(relatedNote:Note)
-    WHERE NOT relatedNote IN similarNotes
-    
-    WITH 
-      similarNote,
-      score,
-      collect(DISTINCT relatedNote) as relatedNotes,
-      similarNotes
-    
-    RETURN {
-      note: {
-        text: similarNote.text,
-        embedding: similarNote.embedding,
-        dayName: similarNote.dayName
-      },
-      score: score,
-      relatedNotes: [
-        note IN relatedNotes 
-        WHERE note IS NOT NULL |
-        note.text
-      ]
-    } as result
-    ORDER BY result.score DESC
+MATCH (u:User {id: $userId})
+CALL db.index.vector.queryNodes('note_embeddings_index', 10, $embedding)
+YIELD node AS similarNote, score
+WHERE score >= $threshold
+
+// Ensure note is in user's hierarchy
+MATCH (u)-[:HAS_YEAR]->(:Year)-[:HAS_MONTH]->(:Month)-[:HAS_DAY]->(:Day)-[:HAS_NOTE]->(similarNote)
+
+WITH similarNote, score
+OPTIONAL MATCH (similarNote)-[:RELATED_TO]-(relatedNote:Note)
+
+// Group related notes and pass through other fields
+WITH similarNote.text AS noteText, 
+     similarNote.embedding AS noteEmbedding, 
+     similarNote.dayName AS noteDayName, 
+     score, 
+     collect(DISTINCT relatedNote.text) AS relatedNotes
+
+RETURN {
+  note: {
+    text: noteText,
+    embedding: noteEmbedding,
+    dayName: noteDayName
+  },
+  score: score,
+  relatedNotes: relatedNotes
+} AS result
+ORDER BY result.score DESC
+
   `;
 
   const result = neo4j.executeQuery(hostName, query, vars);
@@ -249,44 +246,47 @@ export function queryDecider(query: string): QueryDecision {
   return result;
   }
 
-  export function findNotesByTimeConstraints(timeConstraints: TimeConstraints): string[] {
-    const vars = new neo4j.Variables();
-    
-    let query = "MATCH (y:Year)";
-    let whereClause = "";
-    
-    if (timeConstraints.year !== null) {
+export function findNotesByTimeConstraints(timeConstraints: TimeConstraints, userId: string): string[] {
+  const vars = new neo4j.Variables();
+  vars.set("userId", userId);
 
-      const yearValue = parseInt(timeConstraints.year as string);
-      vars.set("year", yearValue);
-      whereClause += "y.year = $year";
-    }
-    
-    if (timeConstraints.month !== null) {
-      query += "-[:MONTH]->(m:Month)";
-      vars.set("month", timeConstraints.month);
-      whereClause += whereClause ? " AND m.month = $month" : "m.month = $month";
-    }
-    
-    if (timeConstraints.day !== null) {
-      query += "-[:DAY]->(d:Day)";
-   
-      const dayValue = parseInt(timeConstraints.day as string);
-      vars.set("day", dayValue);
-      whereClause += whereClause ? " AND d.value = $day" : "d.value = $day";
-    }
-    
-    query += (timeConstraints.day !== null ? "" : "-[:DAY]->(d:Day)") + "-[:NOTE]->(n:Note)";
-    
-    if (whereClause) {
-      query += " WHERE " + whereClause;
-    }
-    
-    query += " RETURN n.text as text";
-    
-    const result = neo4j.executeQuery(hostName, query, vars);
-    return result.Records.map<string>((record) => record.get("text"));
+  let query = `
+    MATCH (u:User {id: $userId})-[:HAS_YEAR]->(y:Year)
+  `;
+
+  let whereClause = "";
+  
+  if (timeConstraints.year !== null) {
+    vars.set("year", parseInt(timeConstraints.year as string));
+    whereClause += "y.year = $year";
+    query += "-[:HAS_MONTH]->(m:Month)";
   }
+  
+  if (timeConstraints.month !== null) {
+    vars.set("month", timeConstraints.month);
+    whereClause += (whereClause ? " AND " : "") + "m.month = $month";
+    query += "-[:HAS_DAY]->(d:Day)";
+  }
+  
+  if (timeConstraints.day !== null) {
+    vars.set("day", parseInt(timeConstraints.day as string));
+    whereClause += (whereClause ? " AND " : "") + "d.value = $day";
+  }
+
+  query += (timeConstraints.day !== null ? "" : "-[:HAS_DAY]->(d:Day)") + "-[:HAS_NOTE]->(n:Note)";
+  
+  if (whereClause) {
+    query += ` WHERE ${whereClause}`;
+  }
+
+  query += " RETURN n.text as text";
+
+  console.log(`Executing query: ${query}`);
+  const result = neo4j.executeQuery(hostName, query, vars);
+
+  return result.Records.map<string>((record) => record.get("text"));
+}
+  
 
 export function deleteAllData(confirmation: string): string {
   if (confirmation.toLowerCase() !== "delete") {
@@ -343,20 +343,18 @@ export function preprocess_lm(text: string): string {
   return output.choices[0].message.content.trim();
 }
 
-export function querySystem(question: string): string {
+export function querySystem(question: string, userId: string): string {
   const decision = queryDecider(question);
   let contextTexts: string[] = [];
+  console.log(userId);
   
   if (decision.queryType === "general") {
-    // First try temporal matching
-    const temporalResults = findNotesByTimeConstraints(decision.timeConstraints);
+    const temporalResults = findNotesByTimeConstraints(decision.timeConstraints, userId);
     
     if (temporalResults.length > 0) {
-      // If temporal search yields results, use those
       contextTexts = temporalResults;
     } else {
-      // If no temporal results, fall back to similarity search
-      const notes = findSimilarNotes(decision.processedQuery);
+      const notes = findSimilarNotes(decision.processedQuery, userId);
       contextTexts = notes.map<string>((result) => {
         let noteContext = result.note.text;
         if (result.relatedNotes && result.relatedNotes.length > 0) {
@@ -366,8 +364,7 @@ export function querySystem(question: string): string {
       });
     }
   } else {
-    // For similarity queries, behavior remains unchanged
-    const notes = findSimilarNotes(decision.processedQuery);
+    const notes = findSimilarNotes(decision.processedQuery, userId);
     contextTexts = notes.map<string>((result) => {
       let noteContext = result.note.text;
       if (result.relatedNotes && result.relatedNotes.length > 0) {
@@ -382,6 +379,7 @@ export function querySystem(question: string): string {
 
 export function getAssistantAnswer(question: string, contextTexts: string[]): string {
   const combinedContext = contextTexts.join("\n\n---\n\n");
+  console.log(combinedContext)
 
   const systemPrompt = `You are a personal AI assistant with access to the user's stored memories and notes.
 Your task is to answer the user's question based on the context provided from their stored notes. 
