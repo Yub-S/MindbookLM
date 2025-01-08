@@ -16,9 +16,9 @@ git clone https://github.com/Yub-S/MindbookLM.git
 cd MindbookLM
 ```
 
-# Backend Setup (MindbookLM-backend)
+### 2. Backend Setup (MindbookLM-backend)
 
-## Install modus and hyp CLIs
+#### Install modus and hyp CLIs
 
 ```bash
 # Install Modus CLI
@@ -29,7 +29,7 @@ npm i -g @hypermode/hyp-cli
 hyp login
 ```
 
-## Configure Environment
+#### Configure Environment
 
 Create a `.env.dev.local` file in the backend directory with the following variables:
 
@@ -41,22 +41,22 @@ MODUS_NEO4J_PASSWORD=<YOUR_NEO4J_PASSWORD_HERE>
 ```
 **Note:** You can create a free Neo4j Sandbox instance to obtain your Neo4j credentials by visiting [Neo4j Sandbox](https://sandbox.neo4j.com/).
 
-## Run the Backend
+#### Run the Backend
 
 ```bash
 cd mindbooklm-backend
 modus dev
 ```
 
-## Frontend Setup (MindbookLM-frontend)
+### 3. Frontend Setup (MindbookLM-frontend)
 
-### Navigate to Frontend Directory
+#### Navigate to Frontend Directory
 
 ```bash
 cd mindbooklm-frontend
 ```
 
-## Configure Environment
+#### Configure Environment
 
 Create a `.env` file with the following variables:
 
@@ -66,25 +66,27 @@ VITE_CLERK_PUBLISHABLE_KEY=<YOUR_CLERK_PUBLISHABLE_KEY>
 VITE_CLERK_SECRET_KEY=<YOUR_CLERK_SECRET_KEY>
 ```
 
-## Install Dependencies and Run
+**Note:** The Clerk keys are required because user authentication has been implemented in the app using Clerk. However, if you don't want to configure Clerk and use user authentication (for example, if you're just testing the app for yourself), you can follow the **Running Without Authentication** section below to skip the authentication setup and use an earlier version of the project where authentication was not yet implemented.
+
+#### Install Dependencies and Run
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Running Without Authentication
+### Running Without Authentication
 
 If you prefer to run MindbookLM without the user authentication system (clerk setup), you can use an earlier version of the project where authentication was not yet implemented.
 
-### Steps to Use the No-Authentication Version:
+#### Steps to Use the No-Authentication Version:
 
 ```bash
 # Clone the repository (if not already done)
 git clone https://github.com/Yub-S/MindbookLM.git
 cd MindbookLM
 
-# Checkout this specific commit (without authentication)
+# Checkout this specific commit 
 git checkout 85ba8b8b9997c2d22828b5c10cf5214b98d3ce90
 ```
-**Note:** You can then follow the remaining setup instructions above, but skip the Clerk configuration in the `.env` as it's not needed.
+**Note:** You can now setup backend and frontend setup as above, but skip the Clerk configuration in the `.env` as it's not needed.
