@@ -15,6 +15,8 @@ MindbookLM basically has two modes of interaction: **Inject Memory Mode** and **
       "connection": "hypermode"
     }
   }
+  ```
+  
   Since this model is hosted by hypermode itself, we don't need to add any additional connection.  
 
 - **`preprocess_lm`**: This function addresses the challenge of relative date references (e.g., "yesterday" or "next Friday"). It converts these references into absolute dates while maintaining the natural flow of your writing. For example, if you write:  
