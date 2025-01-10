@@ -51,9 +51,9 @@ MindbookLM basically has two modes of interaction: **Inject Memory Mode** and **
     }
   }
 
-    With Modus, we can use external models (not hosted by hypermode) by connecting to external endpoints. Since the above model is hosted by Groq, we add an HTTP connection to it to use the `text-generator2` in our functions.  
+  With Modus, we can use external models (not hosted by hypermode) by connecting to external endpoints. Since the above model is hosted by Groq, we add an HTTP connection to it to use the `text-generator2` in our functions.  
 
-    Modus uses specific naming conventions for secret variables. The convention is `MODUS_<CONNECTION NAME>_<PLACEHOLDER>`. So, in this case, the API key should be configured in the `.env.dev.local` file as `MODUS_OPENAI_API_KEY`. We needed consistent and accurate performance for preprocessing, so I have used this bigger model.  
+  Modus uses specific naming conventions for secret variables. The convention is `MODUS_<CONNECTION NAME>_<PLACEHOLDER>`. So, in this case, the API key should be configured in the `.env.dev.local` file as `MODUS_OPENAI_API_KEY`. We needed consistent and accurate performance for preprocessing, so I have used this bigger model.  
 
 - **`addNote`**: The `addNote` function orchestrates the entire flow of Inject Mode. When a note is submitted, it is passed through the `preprocess_lm` function to handle relative dates. The system then generates embeddings for the note using `generateNoteEmbedding`. The note is stored in a temporal hierarchy in Neo4j, categorized by year, month, and day. Additionally, the system searches for similar notes using these embeddings. If similar notes are found, relationships are established between them, creating a web of interconnected memories. This mirrors human memory, enabling users to recall related experiences when reviewing a specific note.  
 
@@ -137,7 +137,7 @@ flowchart TD
     SimilaritySearch --> Retrieve
     
     Retrieve --> Assistant[<b>getAssistantAnswer</b><br/><b>Generate Response</b>]
-    Assistant --> Response[<b>Return Natural</b><br/><b>Language Response</b>]
+    Assistant --> Response[<b>Answer back to the user</b>]
     
     %% Enhanced styling with darker colors and thicker borders
     classDef default fill:#ffffff,stroke:#000000,stroke-width:2px,color:#000000
