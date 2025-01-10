@@ -66,7 +66,7 @@ VITE_CLERK_PUBLISHABLE_KEY=<YOUR_CLERK_PUBLISHABLE_KEY>
 VITE_CLERK_SECRET_KEY=<YOUR_CLERK_SECRET_KEY>
 ```
 
-**Note:** The Clerk keys are required because user authentication has been implemented in the app using Clerk. However, if you don't want to configure Clerk and use user authentication (for example, if you're just testing the app for yourself), you can follow the **Running Without Authentication** section below to skip the authentication setup and use an earlier version of the project where authentication was not yet implemented.
+**Note:** The user authentication has been implemented in the app using Clerk.So we need to get the clerk keys by creating a application in [Clerk](https://clerk.com/).You can just sign up and create a application and get the keys.  However, if you don't want to configure Clerk and don't want user authentication (for example, if you're just testing the app for yourself), you can follow the **Running Without Authentication** section below to skip the authentication setup and use an earlier version of the project where authentication was not yet implemented.
 
 #### Install Dependencies and Run
 

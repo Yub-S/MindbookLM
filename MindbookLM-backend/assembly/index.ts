@@ -15,7 +15,7 @@ const hostName = "neo4j";
 /**
  * Generate embeddings for an array of texts using the minilm model
  */
-export function generateEmbeddings(texts: string[]): f32[][] {
+function generateEmbeddings(texts: string[]): f32[][] {
   const model = models.getModel<EmbeddingsModel>("minilm");
   const input = model.createInput(texts);
   const output = model.invoke(input);
@@ -25,7 +25,7 @@ export function generateEmbeddings(texts: string[]): f32[][] {
 /**
  * Create embedding for a single note text
  */
-export function generateNoteEmbedding(text: string): f32[] {
+function generateNoteEmbedding(text: string): f32[] {
   return generateEmbeddings([text])[0];
 }
 
@@ -112,7 +112,7 @@ export function addNote(o_text: string, userId: string): string {
   return successMessage;
 }
 
-export function findSimilarNotes(text: string, userId: string, threshold: f32 = 0.6): NoteResult[] {
+function findSimilarNotes(text: string, userId: string, threshold: f32 = 0.6): NoteResult[] {
   const embedding = generateNoteEmbedding(text);
   
   const vars = new neo4j.Variables();
@@ -160,7 +160,7 @@ ORDER BY result.score DESC
   });
 }
 
-export function queryDecider(query: string): QueryDecision {
+function queryDecider(query: string): QueryDecision {
   const timestamp = Date.now();
   const now = new Date(timestamp);
   const systemPrompt = `Current date is ${now}.
@@ -246,7 +246,7 @@ export function queryDecider(query: string): QueryDecision {
   return result;
   }
 
-export function findNotesByTimeConstraints(timeConstraints: TimeConstraints, userId: string): string[] {
+function findNotesByTimeConstraints(timeConstraints: TimeConstraints, userId: string): string[] {
   const vars = new neo4j.Variables();
   vars.set("userId", userId);
 
@@ -310,7 +310,7 @@ export function deleteAllData(confirmation: string): string {
   return "success";
 }
 
-export function preprocess_lm(text: string): string {
+function preprocess_lm(text: string): string {
   const timestamp = Date.now();
   const now = new Date(timestamp);
   
@@ -377,7 +377,7 @@ export function querySystem(question: string, userId: string): string {
   return getAssistantAnswer(decision.processedQuery, contextTexts);
 }
 
-export function getAssistantAnswer(question: string, contextTexts: string[]): string {
+function getAssistantAnswer(question: string, contextTexts: string[]): string {
   const combinedContext = contextTexts.join("\n\n---\n\n");
   console.log(combinedContext)
 
