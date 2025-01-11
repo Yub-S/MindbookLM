@@ -50,6 +50,7 @@ MindbookLM basically has two modes of interaction: **Inject Memory Mode** and **
       }
     }
   }
+ ```
 
   With Modus, we can use external models (not hosted by hypermode) by connecting to external endpoints. Since the above model is hosted by Groq, we add an HTTP connection to it to use the `text-generator2` in our functions.  
 
@@ -159,11 +160,12 @@ Here's what I specifically used from the Modus ecosystem:
 3. The Llama-3.3-70b-versatile model hosted on Groq, connected through Modus's HTTP connections
 4. Neo4j integration for our knowledge graph
 
-What really stood out to me about Modus (and Hypermode in general) was how it provides a complete ecosystem rather than just individual components. It's not just about AI model integration or database connections – it's about how everything works together seamlessly.
+What really stood out to me about Modus (and Hypermode in general) was how they provide a complete ecosystem rather than just individual components. It's not just about AI model integration or database connections – it's about how everything works together seamlessly.
 
 For instance, Modus automatically creates endpoints for any functions we export from our index.ts file, making frontend-backend communication effortless. In MindbookLM's case, since we have two modes, we simply exported two main functions: addNote (for inject mode) and querySystem (for chat mode).
+Similarly, The seamless integration of AI models and the ability to easily connect to collections and graph databases like Neo4j makes development incredibly smooth. On top of all this, we can effortlessly deploy our backend application to Hypermode without any complex configuration or setup.
 
-The deployment process to Hypermode is also surprisingly very much smooth . For a first-time user, having everything from model integration to deployment handled so seamlessly made development much more easier and efficient.
+For a first-time user like me, having everything from model integration to automatic endpoint creation to deployment handled so seamlessly made development much more easier and efficient. 
 
 # How Knowledge Graph is Implemented?
 
@@ -177,4 +179,4 @@ Here's how it works in practice: When a new note comes in, two things happen:
 1. It's placed within the temporal structure (either in an existing structure or a new one is created)
 2. It's connected to clusters of related notes based on similarity
 
-This dual organization turned out to be particularly powerful for answering user queries.When the user asks a very time-specific query like (what was my day like exactly one year ago, we could find all the notes in that specific day and pass that to the assistnat) and rather asks a query that is not timespecific and needs similarity searching, the system can pull not just the directly relevant similar notes but also their related notes, providing much richer context for the assistant to work with.
+This dual organization turned out to be particularly powerful for answering user queries. When the user asks a very time-specific query like "what was my day like exactly one year ago", we could find all the notes in that specific day and pass that to the assistant. And when they ask a query that isn't time-specific and needs similarity searching, the system can pull all the notes similar to that query, and for each of those similar notes, it also retrieves their entire cluster of related notes, providing much richer context for the assistant to work with.
