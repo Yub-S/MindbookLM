@@ -1,7 +1,7 @@
 
 # How MindbookLM works?
 
-MindbookLM basically has two modes of interaction: **Inject Memory Mode** and **Chat Mode**. Each mode has distinct functions that facilitate efficient note management and querying.
+MindbookLM basically has two modes of interaction: **Inject Memory Mode** and **Chat Mode**. Each mode has distinct functions that facilitate efficient note/memory management and querying.
 
 ## 1. Inject Memory Mode
 
@@ -50,8 +50,7 @@ MindbookLM basically has two modes of interaction: **Inject Memory Mode** and **
       }
     }
   }
- ```
-
+  ```
   With Modus, we can use external models (not hosted by hypermode) by connecting to external endpoints. Since the above model is hosted by Groq, we add an HTTP connection to it to use the `text-generator2` in our functions.  
 
   Modus uses specific naming conventions for secret variables. The convention is `MODUS_<CONNECTION NAME>_<PLACEHOLDER>`. So, in this case, the API key should be configured in the `.env.dev.local` file as `MODUS_OPENAI_API_KEY`. We needed consistent and accurate performance for preprocessing, so I have used this bigger model.  
@@ -162,7 +161,7 @@ Here's what I specifically used from the Modus ecosystem:
 
 What really stood out to me about Modus (and Hypermode in general) was how they provide a complete ecosystem rather than just individual components. It's not just about AI model integration or database connections – it's about how everything works together seamlessly.
 
-For instance, Modus automatically creates endpoints for any functions we export from our index.ts file, making frontend-backend communication effortless. In MindbookLM's case, since we have two modes, we simply exported two main functions: addNote (for inject mode) and querySystem (for chat mode).
+For instance, Modus automatically creates endpoints for any functions we export from our `index.ts` file, making frontend-backend communication effortless. In MindbookLM's case, since we have two modes, we simply exported two main functions: **addNote** (for inject mode) and **querySystem** (for chat mode).
 Similarly, The seamless integration of AI models and the ability to easily connect to collections and graph databases like Neo4j makes development incredibly smooth. On top of all this, we can effortlessly deploy our backend application to Hypermode without any complex configuration or setup.
 
 For a first-time user like me, having everything from model integration to automatic endpoint creation to deployment handled so seamlessly made development much more easier and efficient. 
@@ -179,4 +178,4 @@ Here's how it works in practice: When a new note comes in, two things happen:
 1. It's placed within the temporal structure (either in an existing structure or a new one is created)
 2. It's connected to clusters of related notes based on similarity
 
-This dual organization turned out to be particularly powerful for answering user queries. When the user asks a very time-specific query like "what was my day like exactly one year ago", we could find all the notes in that specific day and pass that to the assistant. And when they ask a query that isn't time-specific and needs similarity searching, the system can pull all the notes similar to that query, and for each of those similar notes, it also retrieves their entire cluster of related notes, providing much richer context for the assistant to work with.
+This dual organization turned out to be particularly powerful for answering user queries. When the user asks a very time-specific query like 'what was my day like exactly one year ago', we could find all the notes in that specific day, or if they ask 'how has been my entire January of 2025', we could collect all notes from that month, or even 'summarize my 2024' would pull all notes from that year - and pass all of these to the assistant. In these cases, similarity searching wouldn't make sense because we want every single note from those specific time periods, regardless of their content, to get a complete picture of what happened during that time. And when they ask a query that isn't time-specific and needs similarity searching, the system can pull all the notes similar to that query, and for each of those similar notes, it also retrieves their entire cluster of related notes, providing much richer context for the assistant to work with.
