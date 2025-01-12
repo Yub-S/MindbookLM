@@ -94,16 +94,17 @@ For time-based queries, this function searches the temporal hierarchy of notes, 
 - **`getAssistantAnswer`**  
 This function takes the retrieved information and crafts a coherent, natural response to the user's query. The assistant is a `text-generator` model configured in the manifest file.  
 
-```json
-"models": {
-  "text-generator": {
-    "sourceModel": "meta-llama/Meta-Llama-3.1-8B-Instruct",
-    "provider": "hugging-face",
-    "connection": "hypermode"
+  ```json
+  "models": {
+    "text-generator": {
+      "sourceModel": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+      "provider": "hugging-face",
+      "connection": "hypermode"
+    }
   }
-}
-```
-Since this model is hosted by Hypemode itself, we don't need to add any additional connection.
+  ```
+  Since this model is hosted by Hypemode itself, we don't need to add any additional connection.
+
 
 - **`querySystem`**: The `querySystem` function orchestrates the entire flow of Chat Mode. It coordinates the various functions to process the user's query and generate a meaningful response. It begins by determining the query's intent through `queryDecider`, then routes the query to either similarity-based or temporal searches. Once the relevant notes are retrieved, it passes the information to `getAssistantAnswer` to generate a final response.
 
@@ -159,7 +160,7 @@ Here's what I specifically used from the Modus ecosystem:
 3. The Llama-3.3-70b-versatile model hosted on Groq, connected through Modus's HTTP connections
 4. Neo4j integration for our knowledge graph
 
-What really stood out to me about Modus (and Hypermode in general) was how they provide a complete ecosystem rather than just individual components. It's not just about AI model integration or database connections – it's about how everything works together seamlessly.
+What I really liked about Modus (and Hypermode in general) was how they provide a complete ecosystem rather than just individual components. It's not just about AI model integration or database connections – it's about how everything works together seamlessly.
 
 For instance, Modus automatically creates endpoints for any functions we export from our `index.ts` file, making frontend-backend communication effortless. In MindbookLM's case, since we have two modes, we simply exported two main functions: **addNote** (for inject mode) and **querySystem** (for chat mode).
 Similarly, The seamless integration of AI models and the ability to easily connect to collections and graph databases like Neo4j makes development incredibly smooth. On top of all this, we can effortlessly deploy our backend application to Hypermode without any complex configuration or setup.
